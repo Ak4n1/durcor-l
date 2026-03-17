@@ -204,6 +204,11 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
             
             vec3 finalColor = contrastedColor + blueGlow + orangeGlow;
             
+            // Add dark overlay to the entire image
+            vec3 darkOverlay = vec3(0.0, 0.0, 0.0); // Pure black overlay
+            float overlayStrength = 0.7; // 70% dark overlay (MUCH MORE DARK)
+            finalColor = mix(finalColor, darkOverlay, overlayStrength);
+            
             // Add gradient at bottom - 30% bottom black, 70% top fades to transparent
             float gradientStart = 0.7; // Start gradient at 70% (30% from bottom will be black)
             float gradientEnd = 1.0;   // End at bottom (100%)
