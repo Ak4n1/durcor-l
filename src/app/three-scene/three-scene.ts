@@ -193,7 +193,25 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             vec3 contrastedColor = pow(vec3(gray) * 1.25, vec3(1.0));
             
-            gl_FragColor = vec4(contrastedColor, 1.0);
+            // Add blue and orange glows like reference
+            vec2 blueCenter = vec2(0.75, 0.25);
+            float blueDist = distance(vUv, blueCenter);
+            vec3 blueGlow = vec3(0.0, 0.4, 1.0) * (1.0 - smoothstep(0.0, 0.7, blueDist)) * 0.1;
+            
+            vec2 orangeCenter = vec2(0.25, 0.75);
+            float orangeDist = distance(vUv, orangeCenter);
+            vec3 orangeGlow = vec3(0.94, 0.42, 0.0) * (1.0 - smoothstep(0.0, 0.7, orangeDist)) * 0.15;
+            
+            vec3 finalColor = contrastedColor + blueGlow + orangeGlow;
+            
+            // Add gradient at bottom - 30% bottom black, 70% top fades to transparent
+            float gradientStart = 0.7; // Start gradient at 70% (30% from bottom will be black)
+            float gradientEnd = 1.0;   // End at bottom (100%)
+            float bottomGradient = smoothstep(gradientStart, gradientEnd, 1.0 - vUv.y);
+            vec3 blackColor = vec3(0.02, 0.02, 0.02); // Dark black
+            finalColor = mix(finalColor, blackColor, bottomGradient);
+            
+            gl_FragColor = vec4(finalColor, 1.0);
           }
         `,
         depthTest: false,
