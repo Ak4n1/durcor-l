@@ -85,6 +85,46 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
       0%,100% { opacity: 0.4; }
       50% { opacity: 1; }
     }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .hero {
+        padding: 0 4vw 15vh;
+        align-items: center;
+        text-align: center;
+      }
+      .hero__title {
+        font-size: clamp(3.5rem, 12vw, 6rem);
+        margin-bottom: 20px;
+      }
+      .hero__sub {
+        font-size: clamp(0.9rem, 4vw, 1rem);
+        margin-bottom: 30px;
+      }
+      .hero__ctas {
+        justify-content: center;
+        gap: 12px;
+      }
+      .hero__scroll {
+        bottom: 20px;
+        right: 50%;
+        transform: translateX(50%);
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .hero {
+        padding: 0 5vw 12vh;
+      }
+      .hero__title {
+        font-size: clamp(2.8rem, 15vw, 4.5rem);
+      }
+      .hero__ctas {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+    }
   `]
 })
 export class HeroComponent implements OnInit, OnDestroy {

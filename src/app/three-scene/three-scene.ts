@@ -15,7 +15,7 @@ interface CameraKeyframe {
 @Component({
   selector: 'app-three-scene',
   standalone: true,
-  template: `<canvas #canvas></canvas>`,
+  template: `<canvas #canvas [style.display]="shouldRender3D ? 'block' : 'none'"></canvas>`,
   styles: [`
     :host {
       display: block;
@@ -25,6 +25,21 @@ interface CameraKeyframe {
       pointer-events: none;
       background: #050505;
     }
+    
+    /* Fallback background for low-end devices */
+    :host::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #0a0a0c 0%, #1a1a1c 50%, #0a0a0c 100%);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    
+    :host.fallback::before {
+      opacity: 1;
+    }
+    
     canvas {
       display: block;
       width: 100%;
@@ -32,6 +47,20 @@ interface CameraKeyframe {
       position: relative;
       z-index: 1;
       pointer-events: none;
+      
+      /* Mobile optimizations */
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+    }
+    
+    /* Reduce canvas quality on very small screens */
+    @media (max-width: 480px) and (max-height: 800px) {
+      canvas {
+        image-rendering: optimizeSpeed;
+        image-rendering: -webkit-optimize-contrast;
+      }
     }
   `]
 })
@@ -50,6 +79,8 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   private backgroundPlane: THREE.Mesh | null = null;
   private backgroundTexture: THREE.Texture | null = null;
   private bottomGradientPlane: THREE.Mesh | null = null;
+  private isLowEndDevice = false;
+  shouldRender3D = true;
 
   // Camera keyframes per scroll scene
   private readonly keyframes: CameraKeyframe[] = [
@@ -81,30 +112,122 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   ];
 
   private readonly scrollHandler = () => { this.scrollY = window.scrollY; };
+  private throttledScrollHandler: () => void;
+
+  constructor() {
+    // Detect only VERY low-end devices
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const deviceMemory = (navigator as any).deviceMemory;
+    
+    // Only disable 3D on extremely old devices
+    this.isLowEndDevice = isMobile && (
+      /Android.*[2-4]\./i.test(navigator.userAgent) || // Very old Android (2.x, 3.x, 4.x)
+      (deviceMemory && deviceMemory < 1) // Less than 1GB RAM
+    );
+    
+    // Most mobile devices will still show 3D, just optimized
+    if (this.isLowEndDevice) {
+      this.shouldRender3D = false;
+      console.log('Very low-end device detected, 3D rendering disabled');
+    } else {
+      console.log('3D rendering enabled with mobile optimizations');
+    }
+    
+    // Enhanced throttling for mobile to smooth out fast scrolling
+    if (isMobile && this.shouldRender3D) {
+      let ticking = false;
+      let lastScrollY = 0;
+      
+      this.throttledScrollHandler = () => {
+        if (!ticking) {
+          requestAnimationFrame(() => {
+            // Smooth out rapid scroll changes on mobile
+            const currentScrollY = window.scrollY;
+            const scrollDiff = Math.abs(currentScrollY - lastScrollY);
+            
+            // If scroll is very fast, interpolate to smooth it out
+            if (scrollDiff > 50) {
+              this.scrollY = lastScrollY + (currentScrollY - lastScrollY) * 0.3;
+            } else {
+              this.scrollY = currentScrollY;
+            }
+            
+            lastScrollY = currentScrollY;
+            ticking = false;
+          });
+          ticking = true;
+        }
+      };
+    } else {
+      this.throttledScrollHandler = this.scrollHandler;
+    }
+  }
 
   ngOnInit(): void {
+    if (!this.shouldRender3D) {
+      // Just show a static background for low-end devices
+      this.canvasRef.nativeElement.style.display = 'none';
+      this.loadProgress.emit(100);
+      this.loadComplete.emit();
+      return;
+    }
+    
     this.initScene();
     this.loadModel();
     this.animate();
-    window.addEventListener('scroll', this.scrollHandler, { passive: true });
+    window.addEventListener('scroll', this.throttledScrollHandler, { passive: true });
     window.addEventListener('resize', this.onResize);
+    
+    // Pause rendering when page is not visible (mobile battery optimization)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        cancelAnimationFrame(this.animFrameId);
+      } else {
+        this.animate();
+      }
+    });
   }
 
   ngOnDestroy(): void {
     cancelAnimationFrame(this.animFrameId);
-    window.removeEventListener('scroll', this.scrollHandler);
+    window.removeEventListener('scroll', this.throttledScrollHandler);
     window.removeEventListener('resize', this.onResize);
     this.renderer.dispose();
   }
 
   private initScene(): void {
     const canvas = this.canvasRef.nativeElement;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    // Mobile optimizations
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const deviceMemory = (navigator as any).deviceMemory;
+    const isLowEnd = isMobile && (navigator.hardwareConcurrency <= 4 || (deviceMemory && deviceMemory <= 4));
+    
+    // Aggressive mobile pixel ratio reduction
+    let pixelRatio = window.devicePixelRatio;
+    if (isMobile) {
+      pixelRatio = Math.min(pixelRatio, 1.2); // Much lower for mobile
+      if (isLowEnd) pixelRatio = 1; // Even lower for low-end devices
+    }
+    
+    this.renderer = new THREE.WebGLRenderer({ 
+      canvas, 
+      antialias: false, // Always off for mobile
+      alpha: false,
+      powerPreference: isMobile ? 'low-power' : 'high-performance',
+      precision: isMobile ? 'lowp' : 'highp', // Lower precision on mobile
+      stencil: false, // Disable stencil buffer
+      depth: true,
+      logarithmicDepthBuffer: false // Disable for performance
+    });
+    
+    this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setClearColor(0x050505, 1); // solid black clear
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.setClearColor(0x050505, 1);
+    
+    // Disable shadows completely on mobile
+    this.renderer.shadowMap.enabled = false;
+    
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
 
@@ -125,33 +248,41 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   }
 
   private setupLights(): void {
-    // Ambient — very low, just to avoid pure black
-    const ambient = new THREE.AmbientLight(0xffffff, 0.15);
-    this.scene.add(ambient);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // Simplified lighting for mobile - just ambient and one directional
+      const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+      this.scene.add(ambient);
+      
+      const main = new THREE.DirectionalLight(0xfff5e0, 0.8);
+      main.position.set(2, 4, 2);
+      this.scene.add(main);
+    } else {
+      // Full lighting setup for desktop
+      const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+      this.scene.add(ambient);
 
-    // Key light — warm technical spotlight from upper right
-    const key = new THREE.SpotLight(0xfff5e0, 4, 30, Math.PI / 6, 0.4, 1.5);
-    key.position.set(6, 8, 4);
-    key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
-    key.shadow.bias = -0.001;
-    this.scene.add(key);
-    this.scene.add(key.target);
+      const key = new THREE.SpotLight(0xfff5e0, 4, 30, Math.PI / 6, 0.4, 1.5);
+      key.position.set(6, 8, 4);
+      key.castShadow = true;
+      key.shadow.mapSize.set(1024, 1024);
+      key.shadow.bias = -0.001;
+      this.scene.add(key);
+      this.scene.add(key.target);
 
-    // Cool fill — diagnostic blue from left
-    const fill = new THREE.DirectionalLight(0x4488cc, 0.5);
-    fill.position.set(-6, 3, -2);
-    this.scene.add(fill);
+      const fill = new THREE.DirectionalLight(0x4488cc, 0.5);
+      fill.position.set(-6, 3, -2);
+      this.scene.add(fill);
 
-    // Warm rim — separation from behind
-    const rim = new THREE.DirectionalLight(0xff7722, 0.4);
-    rim.position.set(-2, 2, -8);
-    this.scene.add(rim);
+      const rim = new THREE.DirectionalLight(0xff7722, 0.4);
+      rim.position.set(-2, 2, -8);
+      this.scene.add(rim);
 
-    // Ground bounce — very subtle warm
-    const bounce = new THREE.DirectionalLight(0x331100, 0.3);
-    bounce.position.set(0, -3, 0);
-    this.scene.add(bounce);
+      const bounce = new THREE.DirectionalLight(0x331100, 0.3);
+      bounce.position.set(0, -3, 0);
+      this.scene.add(bounce);
+    }
   }
 
   private setupEnvironment(): void {
@@ -159,11 +290,26 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   }
 
   private loadBackgroundImage(): void {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Skip background image on very low-end devices
+    if (this.isLowEndDevice) {
+      console.log('Skipping background image on low-end device');
+      return;
+    }
+    
     const loader = new THREE.TextureLoader();
     const imageUrl = 'assets/images/bg.png';
     
     loader.load(imageUrl, (texture) => {
       this.backgroundTexture = texture;
+      
+      // Reduce texture quality on mobile
+      if (isMobile) {
+        texture.generateMipmaps = false;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+      }
       
       // Create fullscreen quad positioned at "top" of virtual space
       const geometry = new THREE.PlaneGeometry(2, 2);
@@ -229,7 +375,9 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
       this.scene.add(this.backgroundPlane);
       
       // Create additional gradient for the bottom area (below image)
-      this.createBottomGradient();
+      if (!isMobile) {
+        this.createBottomGradient();
+      }
       
       console.log('Background image loaded successfully');
     }, undefined, (error) => {
@@ -286,7 +434,11 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-        const scale = 5 / Math.max(size.x, size.y, size.z);
+        
+        // Different scale for mobile vs desktop
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const baseScale = 5 / Math.max(size.x, size.y, size.z);
+        const scale = isMobile ? baseScale * 0.7 : baseScale; // 30% smaller on mobile
 
         model.scale.setScalar(scale);
         model.position.sub(center.multiplyScalar(scale));
@@ -294,11 +446,30 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
 
         model.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
             const mesh = child as THREE.Mesh;
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // Disable shadows completely on mobile
+            if (!isMobile) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+            
+            // Optimize materials for mobile
             const applyTransparent = (m: THREE.Material) => {
               const mat = (m as THREE.MeshStandardMaterial).clone();
+              
+              if (isMobile) {
+                // Simplify materials on mobile
+                mat.roughness = 0.8;
+                mat.metalness = 0.2;
+                mat.envMapIntensity = 0.5;
+                // Disable expensive material features
+                mat.normalMap = null;
+                mat.roughnessMap = null;
+                mat.metalnessMap = null;
+              }
+              
               mat.transparent = true;
               mat.opacity = 0;
               return mat;
@@ -346,7 +517,12 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
         const box = new THREE.Box3().setFromObject(model);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
-        const scale = 5 / Math.max(size.x, size.y, size.z);
+        
+        // Different scale for mobile vs desktop
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const baseScale = 5 / Math.max(size.x, size.y, size.z);
+        const scale = isMobile ? baseScale * 0.7 : baseScale; // 30% smaller on mobile
+        
         model.scale.setScalar(scale);
         model.position.sub(center.multiplyScalar(scale));
         model.position.y = -1;
@@ -388,13 +564,20 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   }
 
   private getCameraForScroll(fraction: number): { position: THREE.Vector3, target: THREE.Vector3 } {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
     // Find which keyframe pair we're in
     for (let i = 0; i < this.keyframes.length; i++) {
       const kf = this.keyframes[i];
       if (fraction >= kf.scrollStart && fraction <= kf.scrollEnd) {
         const next = this.keyframes[Math.min(i + 1, this.keyframes.length - 1)];
         const t = (fraction - kf.scrollStart) / (kf.scrollEnd - kf.scrollStart);
-        const smooth = t * t * (3 - 2 * t); // smoothstep
+        
+        // Extra smooth easing on mobile to handle fast scrolling
+        const smooth = isMobile ? 
+          t * t * t * (t * (t * 6 - 15) + 10) : // Smoother quintic easing on mobile
+          t * t * (3 - 2 * t); // Regular smoothstep on desktop
+          
         return {
           position: new THREE.Vector3().lerpVectors(kf.position, next.position, smooth),
           target: new THREE.Vector3().lerpVectors(kf.target, next.target, smooth)
@@ -408,33 +591,51 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   private animate = (): void => {
     this.animFrameId = requestAnimationFrame(this.animate);
 
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Reduce animation frequency on mobile
+    if (isMobile) {
+      // Skip frames on mobile for better performance
+      if (this.animFrameId % 2 !== 0) {
+        return;
+      }
+    }
+
     const totalScroll = document.body.scrollHeight - window.innerHeight;
-    const fraction = totalScroll > 0 ? Math.min(this.scrollY / totalScroll, 1) : 0;
+    let scrollProgress = totalScroll > 0 ? Math.min(this.scrollY / totalScroll, 1) : 0;
+    
+    // Reduce scroll sensitivity on mobile - make it slower
+    if (isMobile) {
+      scrollProgress = scrollProgress * 0.3; // Super slow - 70% slower scroll on mobile
+    }
+    
+    const { position, target } = this.getCameraForScroll(scrollProgress);
 
-    const { position, target } = this.getCameraForScroll(fraction);
-
-    // Smooth lerp toward target camera state
-    this.currentPos.lerp(position, 0.04);
-    this.currentTarget.lerp(target, 0.04);
+    // Much slower lerp on mobile to smooth out fast scrolling
+    const lerpSpeed = isMobile ? 0.02 : 0.04; // Slower on mobile for smoother movement
+    this.currentPos.lerp(position, lerpSpeed);
+    this.currentTarget.lerp(target, lerpSpeed);
 
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentTarget);
 
-    // Move background up as we scroll down - simulates it staying in place
-    if (this.backgroundPlane && this.backgroundPlane.material) {
-      const material = this.backgroundPlane.material as THREE.ShaderMaterial;
-      const windowHeight = window.innerHeight;
-      const scrollProgress = this.scrollY / windowHeight;
-      // Move background up proportionally to scroll
-      material.uniforms['uViewportOffset'].value = scrollProgress * 2.0;
-    }
+    // Simplify background updates on mobile
+    if (!isMobile) {
+      // Move background up as we scroll down - simulates it staying in place
+      if (this.backgroundPlane && this.backgroundPlane.material) {
+        const material = this.backgroundPlane.material as THREE.ShaderMaterial;
+        const windowHeight = window.innerHeight;
+        const scrollProgress = this.scrollY / windowHeight;
+        material.uniforms['uViewportOffset'].value = scrollProgress * 2.0;
+      }
 
-    // Move bottom gradient with same offset as background
-    if (this.bottomGradientPlane && this.bottomGradientPlane.material) {
-      const material = this.bottomGradientPlane.material as THREE.ShaderMaterial;
-      const windowHeight = window.innerHeight;
-      const scrollProgress = this.scrollY / windowHeight;
-      material.uniforms['uViewportOffset'].value = scrollProgress * 2.0;
+      // Move bottom gradient with same offset as background
+      if (this.bottomGradientPlane && this.bottomGradientPlane.material) {
+        const material = this.bottomGradientPlane.material as THREE.ShaderMaterial;
+        const windowHeight = window.innerHeight;
+        const scrollProgress = this.scrollY / windowHeight;
+        material.uniforms['uViewportOffset'].value = scrollProgress * 2.0;
+      }
     }
 
     this.renderer.render(this.scene, this.camera);

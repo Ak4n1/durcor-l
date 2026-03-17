@@ -25,6 +25,33 @@ html, body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   scroll-behavior: smooth;
+  
+  /* Mobile optimizations */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Prevent zoom on input focus on iOS */
+input, textarea, select {
+  font-size: 16px;
+}
+
+/* Improve touch targets on mobile */
+@media (max-width: 768px) {
+  .btn {
+    min-height: 44px;
+    padding: 16px 28px;
+  }
+  
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 app-root { display: block; }
