@@ -2,3 +2,11 @@ main {
   position: relative;
   z-index: 15;
 }
+
+.global-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5); /* RED overlay for testing z-index */
+  z-index: 12; /* Above canvas (10) but below main content (15) */
+  pointer-events: none;
+}
