@@ -2,12 +2,19 @@ import { Injectable } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class RevealService {
+  private hasInitialized = false;
+
   init(): void {
+    if (this.hasInitialized) return;
+    this.hasInitialized = true;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            entry.target.classList.add('visible');
+            setTimeout(() => {
+              entry.target.classList.add('visible');
+            }, 50);
           }
         });
       },
@@ -22,9 +29,15 @@ export class RevealService {
       });
     };
 
-    // Initial pass + re-observe after dynamic content
-    observe();
-    setTimeout(observe, 500);
-    setTimeout(observe, 1500);
+    // Wait for DOM to settle, then observe
+    setTimeout(() => {
+      observe();
+    }, 200);
+
+    // Re-observe after dynamic content
+    setTimeout(observe, 800);
+    setTimeout(observe, 2000);
   }
 }
+
+

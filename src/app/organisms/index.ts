@@ -1,0 +1,11 @@
+export { NavbarComponent } from './navbar/navbar';
+export { HeroComponent } from './hero/hero';
+export { PreloaderComponent } from './preloader/preloader';
+export { ServicesComponent } from './services-section/services-section';
+export { ColvenComponent } from './colven-section/colven-section';
+export { AgroComponent } from './agro-section/agro-section';
+export { WhyComponent } from './why-section/why-section';
+export { ProcessComponent } from './process-section/process-section';
+export { ContactComponent } from './contact-section/contact-section';
+export { FinalCtaComponent } from './final-cta-section/final-cta-section';
+export { FooterComponent } from './footer/footer';
