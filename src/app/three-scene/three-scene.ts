@@ -21,13 +21,16 @@ interface CameraKeyframe {
       display: block;
       position: fixed;
       inset: 0;
-      z-index: 0;
+      z-index: 10; /* above hero background but below hero content */
       pointer-events: none;
+      background: #050505;
     }
     canvas {
       display: block;
       width: 100%;
       height: 100%;
+      position: relative;
+      z-index: 1;
       pointer-events: none;
     }
   `]
@@ -44,33 +47,35 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   private scrollY = 0;
   private currentPos = new THREE.Vector3();
   private currentTarget = new THREE.Vector3();
+  private backgroundPlane: THREE.Mesh | null = null;
+  private backgroundTexture: THREE.Texture | null = null;
 
   // Camera keyframes per scroll scene
   private readonly keyframes: CameraKeyframe[] = [
     {
       scrollStart: 0, scrollEnd: 0.2,
-      position: new THREE.Vector3(5, 2.5, 3),
-      target: new THREE.Vector3(0, 0.2, 0)
+      position: new THREE.Vector3(0, 1.2, 6), // frontal view
+      target: new THREE.Vector3(0, 0.5, 0)
     },
     {
       scrollStart: 0.2, scrollEnd: 0.4,
-      position: new THREE.Vector3(2, 1.8, 4),
-      target: new THREE.Vector3(0.5, 0.8, 0)
+      position: new THREE.Vector3(4, 2, 4), // diagonal right
+      target: new THREE.Vector3(0, 0.2, 0)
     },
     {
       scrollStart: 0.4, scrollEnd: 0.6,
-      position: new THREE.Vector3(-4, 0.6, 3),
-      target: new THREE.Vector3(-0.5, -0.2, 0)
+      position: new THREE.Vector3(-4, 1.5, 3), // left side
+      target: new THREE.Vector3(0, 0, 0)
     },
     {
       scrollStart: 0.6, scrollEnd: 0.8,
-      position: new THREE.Vector3(0, 1.5, 5),
+      position: new THREE.Vector3(0, 2, -5), // rear view
       target: new THREE.Vector3(0, 0.5, 0)
     },
     {
       scrollStart: 0.8, scrollEnd: 1.0,
-      position: new THREE.Vector3(6, 3.5, 6),
-      target: new THREE.Vector3(0, -0.5, 0)
+      position: new THREE.Vector3(5, 3, 5), // high angle
+      target: new THREE.Vector3(0, 0, 0)
     }
   ];
 
@@ -96,13 +101,14 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setClearColor(0x050505, 1); // solid black clear
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0d0d0f);
+    this.scene.background = new THREE.Color(0x050505); // solid black background
 
     // Initial camera
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -114,6 +120,7 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
 
     this.setupLights();
     this.setupEnvironment();
+    this.loadBackgroundImage();
   }
 
   private setupLights(): void {
@@ -147,20 +154,86 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   }
 
   private setupEnvironment(): void {
-    // Dark industrial floor with subtle reflection
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x0e0e10,
-      roughness: 0.6,
-      metalness: 0.4,
-    });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -1;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
+    // No floor — background image shows through transparent canvas
+  }
 
-    // Subtle fog to fade edges into darkness
-    this.scene.fog = new THREE.FogExp2(0x0d0d0f, 0.04);
+  private loadBackgroundImage(): void {
+    const loader = new THREE.TextureLoader();
+    const imageUrl = 'assets/images/bg.png';
+    
+    loader.load(imageUrl, (texture) => {
+      this.backgroundTexture = texture;
+      
+      // Create background plane that covers the entire screen
+      const geometry = new THREE.PlaneGeometry(2, 2);
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          uTexture: { value: texture },
+          uOpacity: { value: 1.0 },
+          uScrollProgress: { value: 0.0 }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D uTexture;
+          uniform float uOpacity;
+          uniform float uScrollProgress;
+          varying vec2 vUv;
+          
+          void main() {
+            vec4 texColor = texture2D(uTexture, vUv);
+            
+            // Apply grayscale and contrast like in reference
+            float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+            vec3 grayColor = vec3(gray);
+            vec3 contrastedColor = pow(grayColor * 1.25, vec3(1.0));
+            
+            // Add overlays like in reference
+            vec2 center = vec2(0.5, 0.5);
+            
+            // Blue glow (top-right)
+            vec2 blueCenter = vec2(0.75, 0.25);
+            float blueDist = distance(vUv, blueCenter);
+            vec3 blueGlow = vec3(0.0, 0.4, 1.0) * (1.0 - smoothstep(0.0, 0.7, blueDist)) * 0.1;
+            
+            // Orange glow (bottom-left)
+            vec2 orangeCenter = vec2(0.25, 0.75);
+            float orangeDist = distance(vUv, orangeCenter);
+            vec3 orangeGlow = vec3(0.94, 0.42, 0.0) * (1.0 - smoothstep(0.0, 0.7, orangeDist)) * 0.15;
+            
+            // Dark overlay gradient (top to bottom)
+            float gradientMask = smoothstep(0.0, 1.0, vUv.y);
+            vec3 darkOverlay = mix(vec3(0.02, 0.02, 0.02), vec3(0.0, 0.0, 0.0), gradientMask) * 0.6;
+            
+            // Combine all effects
+            vec3 finalColor = contrastedColor + blueGlow + orangeGlow - darkOverlay;
+            
+            // Fade to black based on scroll
+            float fadeOpacity = 1.0 - smoothstep(0.0, 0.7, uScrollProgress);
+            finalColor = mix(vec3(0.02, 0.02, 0.02), finalColor, fadeOpacity);
+            
+            gl_FragColor = vec4(finalColor, uOpacity);
+          }
+        `,
+        depthTest: false,
+        depthWrite: false
+      });
+      
+      this.backgroundPlane = new THREE.Mesh(geometry, material);
+      this.backgroundPlane.renderOrder = -1; // Render behind everything
+      this.backgroundPlane.position.z = -10; // Move far back
+      this.scene.add(this.backgroundPlane);
+      
+      console.log('Background image loaded successfully');
+    }, undefined, (error) => {
+      console.error('Error loading background image:', error);
+      console.log('Attempted to load:', imageUrl);
+    });
   }
 
   private loadModel(): void {
@@ -307,6 +380,14 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
 
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentTarget);
+
+    // Update background image opacity based on scroll
+    if (this.backgroundPlane && this.backgroundPlane.material) {
+      const material = this.backgroundPlane.material as THREE.ShaderMaterial;
+      const windowHeight = window.innerHeight;
+      const scrollProgress = Math.min(this.scrollY / (windowHeight * 0.7), 1);
+      material.uniforms['uScrollProgress'].value = scrollProgress;
+    }
 
     this.renderer.render(this.scene, this.camera);
   };

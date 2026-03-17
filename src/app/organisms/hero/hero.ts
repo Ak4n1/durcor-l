@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 
 @Component({
   selector: 'app-hero',
@@ -30,8 +30,13 @@ import { Component } from '@angular/core';
       padding: 0 6vw 22vh;
       position: relative;
       z-index: 1;
+      overflow: hidden;
     }
-    .hero__content { max-width: 640px; }
+    .hero__content { 
+      max-width: 640px; 
+      position: relative;
+      z-index: 20;
+    }
     .eyebrow {
       font-size: 0.7rem;
       letter-spacing: 0.35em;
@@ -68,6 +73,7 @@ import { Component } from '@angular/core';
       letter-spacing: 0.2em;
       text-transform: uppercase;
       color: var(--text-3);
+      z-index: 20;
     }
     .hero__scroll-line {
       width: 1px;
@@ -81,4 +87,7 @@ import { Component } from '@angular/core';
     }
   `]
 })
-export class HeroComponent {}
+export class HeroComponent implements OnInit, OnDestroy {
+  ngOnInit() {}
+  ngOnDestroy() {}
+}
