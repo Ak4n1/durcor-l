@@ -108,7 +108,7 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
     this.renderer.toneMappingExposure = 1.1;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x050505); // solid black background
+    this.scene.background = new THREE.Color(0x050505); // black background for when image is out of view
 
     // Initial camera
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -164,60 +164,36 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
     loader.load(imageUrl, (texture) => {
       this.backgroundTexture = texture;
       
-      // Create background plane that covers the entire screen
+      // Create fullscreen quad positioned at "top" of virtual space
       const geometry = new THREE.PlaneGeometry(2, 2);
       const material = new THREE.ShaderMaterial({
         uniforms: {
           uTexture: { value: texture },
-          uOpacity: { value: 1.0 },
-          uScrollProgress: { value: 0.0 }
+          uViewportOffset: { value: 0.0 }
         },
         vertexShader: `
+          uniform float uViewportOffset;
           varying vec2 vUv;
           void main() {
             vUv = uv;
-            gl_Position = vec4(position, 1.0);
+            // Move the background up as we scroll down - simulates staying in place
+            vec4 pos = vec4(position, 1.0);
+            pos.y += uViewportOffset;
+            gl_Position = pos;
           }
         `,
         fragmentShader: `
           uniform sampler2D uTexture;
-          uniform float uOpacity;
-          uniform float uScrollProgress;
           varying vec2 vUv;
           
           void main() {
             vec4 texColor = texture2D(uTexture, vUv);
             
-            // Apply grayscale and contrast like in reference
+            // Apply effects like reference
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
-            vec3 grayColor = vec3(gray);
-            vec3 contrastedColor = pow(grayColor * 1.25, vec3(1.0));
+            vec3 contrastedColor = pow(vec3(gray) * 1.25, vec3(1.0));
             
-            // Add overlays like in reference
-            vec2 center = vec2(0.5, 0.5);
-            
-            // Blue glow (top-right)
-            vec2 blueCenter = vec2(0.75, 0.25);
-            float blueDist = distance(vUv, blueCenter);
-            vec3 blueGlow = vec3(0.0, 0.4, 1.0) * (1.0 - smoothstep(0.0, 0.7, blueDist)) * 0.1;
-            
-            // Orange glow (bottom-left)
-            vec2 orangeCenter = vec2(0.25, 0.75);
-            float orangeDist = distance(vUv, orangeCenter);
-            vec3 orangeGlow = vec3(0.94, 0.42, 0.0) * (1.0 - smoothstep(0.0, 0.7, orangeDist)) * 0.15;
-            
-            // Dark overlay gradient (top to bottom)
-            float gradientMask = smoothstep(0.0, 1.0, vUv.y);
-            vec3 darkOverlay = mix(vec3(0.02, 0.02, 0.02), vec3(0.0, 0.0, 0.0), gradientMask) * 0.6;
-            
-            // Combine all effects
-            vec3 finalColor = contrastedColor + blueGlow + orangeGlow - darkOverlay;
-            
-            // Fade to black based on scroll
-            float fadeOpacity = 1.0 - smoothstep(0.0, 0.7, uScrollProgress);
-            finalColor = mix(vec3(0.02, 0.02, 0.02), finalColor, fadeOpacity);
-            
-            gl_FragColor = vec4(finalColor, uOpacity);
+            gl_FragColor = vec4(contrastedColor, 1.0);
           }
         `,
         depthTest: false,
@@ -225,14 +201,12 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
       });
       
       this.backgroundPlane = new THREE.Mesh(geometry, material);
-      this.backgroundPlane.renderOrder = -1; // Render behind everything
-      this.backgroundPlane.position.z = -10; // Move far back
+      this.backgroundPlane.renderOrder = -999; // Behind everything
       this.scene.add(this.backgroundPlane);
       
       console.log('Background image loaded successfully');
     }, undefined, (error) => {
       console.error('Error loading background image:', error);
-      console.log('Attempted to load:', imageUrl);
     });
   }
 
@@ -381,12 +355,13 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
     this.camera.position.copy(this.currentPos);
     this.camera.lookAt(this.currentTarget);
 
-    // Update background image opacity based on scroll
+    // Move background up as we scroll down - simulates it staying in place
     if (this.backgroundPlane && this.backgroundPlane.material) {
       const material = this.backgroundPlane.material as THREE.ShaderMaterial;
       const windowHeight = window.innerHeight;
-      const scrollProgress = Math.min(this.scrollY / (windowHeight * 0.7), 1);
-      material.uniforms['uScrollProgress'].value = scrollProgress;
+      const scrollProgress = this.scrollY / windowHeight;
+      // Move background up proportionally to scroll
+      material.uniforms['uViewportOffset'].value = scrollProgress * 2.0;
     }
 
     this.renderer.render(this.scene, this.camera);
