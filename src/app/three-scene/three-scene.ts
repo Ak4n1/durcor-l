@@ -49,6 +49,7 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
   private currentTarget = new THREE.Vector3();
   private backgroundPlane: THREE.Mesh | null = null;
   private backgroundTexture: THREE.Texture | null = null;
+  private bottomGradientPlane: THREE.Mesh | null = null;
 
   // Camera keyframes per scroll scene
   private readonly keyframes: CameraKeyframe[] = [
@@ -213,7 +214,7 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
             float gradientStart = 0.7; // Start gradient at 70% (30% from bottom will be black)
             float gradientEnd = 1.0;   // End at bottom (100%)
             float bottomGradient = smoothstep(gradientStart, gradientEnd, 1.0 - vUv.y);
-            vec3 blackColor = vec3(0.02, 0.02, 0.02); // Dark black
+            vec3 blackColor = vec3(0.02, 0.02, 0.02); // Back to dark black
             finalColor = mix(finalColor, blackColor, bottomGradient);
             
             gl_FragColor = vec4(finalColor, 1.0);
@@ -227,10 +228,51 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
       this.backgroundPlane.renderOrder = -999; // Behind everything
       this.scene.add(this.backgroundPlane);
       
+      // Create additional gradient for the bottom area (below image)
+      this.createBottomGradient();
+      
       console.log('Background image loaded successfully');
     }, undefined, (error) => {
       console.error('Error loading background image:', error);
     });
+  }
+
+  private createBottomGradient(): void {
+    // Create gradient for bottom area in canvas
+    const geometry = new THREE.PlaneGeometry(2, 4); // Tall plane for gradient
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uViewportOffset: { value: 0.0 }
+      },
+      vertexShader: `
+        uniform float uViewportOffset;
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          vec4 pos = vec4(position, 1.0);
+          // Position at bottom of screen, moves with scroll
+          pos.y = -2.0 + uViewportOffset;
+          gl_Position = pos;
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        void main() {
+          // Gradient from black at bottom to transparent at top
+          float gradient = smoothstep(0.0, 1.0, vUv.y);
+          vec3 blackColor = vec3(0.0, 0.0, 0.0);
+          float alpha = 1.0 - gradient; // Inverted - black at bottom, transparent at top
+          gl_FragColor = vec4(blackColor, alpha * 0.9);
+        }
+      `,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false
+    });
+    
+    this.bottomGradientPlane = new THREE.Mesh(geometry, material);
+    this.bottomGradientPlane.renderOrder = -998; // In front of background but behind everything else
+    this.scene.add(this.bottomGradientPlane);
   }
 
   private loadModel(): void {
@@ -384,6 +426,14 @@ export class ThreeSceneComponent implements OnInit, OnDestroy {
       const windowHeight = window.innerHeight;
       const scrollProgress = this.scrollY / windowHeight;
       // Move background up proportionally to scroll
+      material.uniforms['uViewportOffset'].value = scrollProgress * 2.0;
+    }
+
+    // Move bottom gradient with same offset as background
+    if (this.bottomGradientPlane && this.bottomGradientPlane.material) {
+      const material = this.bottomGradientPlane.material as THREE.ShaderMaterial;
+      const windowHeight = window.innerHeight;
+      const scrollProgress = this.scrollY / windowHeight;
       material.uniforms['uViewportOffset'].value = scrollProgress * 2.0;
     }
 
