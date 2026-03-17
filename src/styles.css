@@ -1,1 +1,267 @@
-/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Barlow+Condensed:wght@400;600;700;900&display=swap');
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0d0d0f;
+  --card: rgba(13, 13, 15, 0.82);
+  --card-border: rgba(255,255,255,0.07);
+  --accent: #E05A00;
+  --accent-hover: #f06510;
+  --text: #f2f2f2;
+  --text-2: rgba(242,242,242,0.65);
+  --text-3: rgba(242,242,242,0.35);
+  --radius: 4px;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+app-root { display: block; }
+
+h1, h2, h3, h4 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* Utility: card glass */
+.glass {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.d1 { transition-delay: 0.1s; }
+.d2 { transition-delay: 0.2s; }
+.d3 { transition-delay: 0.3s; }
+.d4 { transition-delay: 0.4s; }
+.d5 { transition-delay: 0.5s; }
+
+/* Shared section layout */
+.section {
+  position: relative;
+  z-index: 1;
+  padding: 100px 6vw;
+}
+
+.section__header { margin-bottom: 56px; }
+
+.eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.section-sub {
+  font-size: 1rem;
+  color: var(--text-2);
+  line-height: 1.75;
+  max-width: 520px;
+}
+
+/* Shared btn */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 13px 28px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  transition: all 0.22s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-ghost { background: transparent; color: var(--text); border-color: rgba(255,255,255,0.15); }
+.btn-ghost:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.04); }
+
+/* NAVBAR STYLES */
+.navbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  padding: 24px 6vw;
+  transition: background 0.4s ease, padding 0.4s ease;
+}
+.navbar.scrolled {
+  background: rgba(13,13,15,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 16px 6vw;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.navbar__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.navbar__logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--text);
+  transition: color 0.2s;
+}
+.navbar__logo:hover { color: var(--accent); }
+
+/* Desktop links */
+.navbar__links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.navbar__links a {
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  transition: color 0.2s;
+  cursor: pointer;
+}
+.navbar__links a:hover { color: var(--text); }
+.navbar__cta {
+  padding: 10px 20px;
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-radius: var(--radius);
+}
+.navbar__cta:hover { background: var(--accent-hover) !important; }
+
+/* Hamburger */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 201;
+}
+.hamburger span {
+  display: block;
+  width: 100%;
+  height: 1.5px;
+  background: var(--text);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform-origin: center;
+}
+.hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+/* Drawer */
+.drawer {
+  position: fixed;
+  top: 0; right: 0;
+  width: 280px;
+  height: 100dvh;
+  background: rgba(13,13,15,0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-left: 1px solid rgba(255,255,255,0.07);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  padding: 48px 32px;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.drawer.open { transform: translateX(0); }
+.drawer__logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--text);
+  margin-bottom: 48px;
+}
+.drawer__links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.drawer__links a {
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: color 0.2s;
+  cursor: pointer;
+}
+.drawer__links a:hover { color: var(--text); }
+.drawer__cta {
+  margin-top: 16px;
+  padding: 14px 20px !important;
+  background: var(--accent);
+  color: #fff !important;
+  border-radius: var(--radius);
+  text-align: center;
+  border-bottom: none !important;
+}
+.drawer__cta:hover { background: var(--accent-hover); }
+
+/* Overlay */
+.drawer__overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 299;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.drawer__overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  .navbar__links { display: none; }
+  .hamburger { display: flex; }
+  .drawer__overlay { display: block; }
+}
