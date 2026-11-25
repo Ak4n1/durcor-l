@@ -19,7 +19,7 @@ import { Component } from '@angular/core';
         </nav>
         <div class="info">
           <div>[Dirección del taller]</div>
-          <div>[Teléfono / WhatsApp]</div>
+          <div>+54 2983 512738</div>
           <div>Lun–Vie 8:00–18:00 · Sáb 8:00–13:00</div>
         </div>
       </div>
