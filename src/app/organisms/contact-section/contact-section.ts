@@ -25,7 +25,7 @@ import { LucideAngularModule, MapPin, Phone, Clock } from 'lucide-angular';
                 <lucide-icon [img]="Phone" [size]="15" [strokeWidth]="1.5" class="detail__ico"></lucide-icon>
                 <div>
                   <span class="detail__label">Teléfono / WhatsApp</span>
-                  <span class="detail__val">[Número de contacto]</span>
+                  <span class="detail__val">+54 2983 512738</span>
                 </div>
               </div>
               <div class="detail">
@@ -37,8 +37,8 @@ import { LucideAngularModule, MapPin, Phone, Clock } from 'lucide-angular';
               </div>
             </div>
             <div class="ctas reveal d4">
-              <a href="https://wa.me/[numero]" class="btn btn-primary" target="_blank">WhatsApp</a>
-              <a href="tel:[numero]" class="btn btn-ghost">Llamar</a>
+              <a href="https://wa.me/5492983512738" class="btn btn-primary" target="_blank">WhatsApp</a>
+              <a href="tel:+542983512738" class="btn btn-ghost">Llamar</a>
             </div>
           </div>
           <div class="map-wrap glass reveal d2">
